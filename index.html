@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Lorenzo - Professional Dark Theme with Avatar</title>
+<style>
+  body.dimmed {
+    background-color: rgba(0, 0, 0, 0.6);
+    transition: background-color 0.5s ease;
+  }
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: #121212;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    color: #e0e0e0;
+    flex-direction: column;
+  }
+
+  #chat-container {
+    background: #1e1e1e;
+    border-radius: 15px;
+    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.5);
+    width: 90%;
+    max-width: 800px;
+    height: 70vh;
+    min-width: 300px;
+    min-height: 300px;
+    margin: 20px 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    resize: both;
+    overflow: auto;
+    position: relative;
+  }
+
+  h1 {
+    background-color: #333;
+    color: #ffffff;
+    margin: 0;
+    padding: 20px;
+    text-align: center;
+    font-size: 1.5em;
+  }
+
+  #chat-history {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background-color: #181818;
+  }
+
+  .message {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    animation: fadeIn 0.5s ease;
+  }
+
+  .user-message, .bot-message {
+    padding: 15px;
+    border-radius: 10px;
+    max-width: 80%;
+    word-wrap: break-word;
+  }
+
+  .user-message {
+    align-self: flex-start;
+    background-color: #ffffff;
+    color: #000;
+  }
+
+  .bot-message {
+    align-self: flex-end;
+    background-color: #333;
+    color: #e0e0e0;
+    text-align: left;
+    direction: ltr;
+    padding: 20px;
+    border: 1px solid #4CAF50;
+    box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.5);
+  }
+
+  form {
+    display: flex;
+    border-top: 1px solid #333;
+    padding: 15px;
+    background-color: #1e1e1e;
+    margin: 0 10px;
+  }
+
+  input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #444;
+    border-radius: 5px;
+    outline: none;
+    font-size: 1em;
+    background-color: #333;
+    color: #e0e0e0;
+    margin-right: 10px;
+  }
+
+  button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: background-color 0.3s ease;
+  }
+
+  button:hover {
+    background-color: #45a049;
+  }
+
+  #loader {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  #chat-container::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, transparent, #4CAF50);
+    cursor: se-resize;
+  }
+
+  #chat-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 2;
+  }
+
+  #upload-form {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    background-color: #1e1e1e;
+    padding: 15px;
+    width: 90%;
+    max-width: 800px;
+    border-top: 1px solid #333;
+    margin: 10px 0;
+    border-radius: 10px;
+    box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.5);
+  }
+
+  #upload-status {
+    text-align: center;
+    margin-top: 10px;
+    color: #4CAF50;
+  }
+</style>
+</head>
+
+<body>
+<div id="chat-container">
+  <div id="chat-overlay"></div>
+  <h1 style="font-family: 'Poppins', sans-serif;">Lorenzo</h1>
+  <h2 style="font-family: 'Poppins', sans-serif; font-size: 1em; font-weight: 300; color: #aaaaaa; text-align: center; margin: 0; padding-bottom: 20px;">AI-Career Assistant</h2>
+  <div id="chat-history"></div>
+  <form id="chat-form">
+    <input type="text" id="user-input" placeholder="Type your message here...">
+    <button type="submit">Send</button>
+  </form>
+</div>
+<form id="upload-form" action="/upload-pdf" method="POST" enctype="multipart/form-data">
+  <input type="file" name="pdf" accept="application/pdf" id="pdf-upload">
+  <button type="button" id="upload-button">Upload PDF</button>
+</form>
+<div id="upload-status"></div>
+<div id="loader" style="z-index: 3;">
+  <img src="loader.gif" width="100px" alt="Loading...">
+</div>
+<script>
+  const chatHistory = document.getElementById('chat-history');
+  const userInput = document.getElementById('user-input');
+  const form = document.getElementById('chat-form');
+
+  let isProcessing = false;
+
+  async function sendMessage() {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    const userMessage = userInput.value;
+    userInput.value = '';
+
+    chatHistory.innerHTML += `<div class="message"><div class="user-message">${userMessage}</div></div>`;
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+
+    const loader = document.getElementById('loader');
+    loader.style.display = 'block';
+
+    try {
+      const response = await fetch('/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userInput: userMessage }),
+      });
+
+      const data = await response.json();
+      let botMessage = data.response;
+      botMessage = botMessage
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/_(.*?)_/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
+
+      chatHistory.innerHTML += `<div class="message" style="justify-content: flex-end;"><div class="bot-message">${botMessage}</div></div>`;
+      chatHistory.scrollTop = chatHistory.scrollHeight;
+
+    } catch (error) {
+      console.error('Error:', error);
+      chatHistory.innerHTML += `<div class="message" style="justify-content: flex-end;"><div class="bot-message">Sorry, something went wrong. Please try again later.</div></div>`;
+    } finally {
+      loader.style.display = 'none';
+      isProcessing = false;
+    }
+  }
+
+  document.getElementById('upload-button').addEventListener('click', async () => {
+    const fileInput = document.getElementById('pdf-upload');
+    const statusDiv = document.getElementById('upload-status');
+
+    if (!fileInput.files.length) {
+      statusDiv.textContent = 'Please select a file to upload.';
+      statusDiv.style.color = 'red';
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('pdf', fileInput.files[0]);
+
+    statusDiv.textContent = 'Uploading...';
+    statusDiv.style.color = '#4CAF50';
+
+    try {
+      const response = await fetch('/upload-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        statusDiv.textContent = `Upload successful`;
+      } else {
+        statusDiv.textContent = result.error || 'Upload failed.';
+        statusDiv.style.color = 'red';
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      statusDiv.textContent = 'An error occurred during upload.';
+      statusDiv.style.color = 'red';
+    }
+  });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (userInput.value.trim() !== '') {
+      sendMessage();
+    }
+  });
+</script>
+</body>
+</html>
